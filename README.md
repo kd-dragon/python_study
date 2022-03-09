@@ -1,2 +1,2 @@
 # python_study
-studying python by myself
+## studying python by myself
