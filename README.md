@@ -1,2 +1,4 @@
 # python_study
-## studying python by myself
+파이썬 독학
+studying python by myself
+    
