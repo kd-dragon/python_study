@@ -1,0 +1,1314 @@
+
+툴 안의 데이터들을 어떻게 핸들링 해야할까????
+
+html 처럼 툴 안에서 이뤄지는 행위들을 걸러내고 하면서 할 수 있다.
+
+
+보통 툴의 기능 -> 
+포토샾의 action/ 모든 행위를 녹화했다가 매크로처럼 쓰는거. 
+
+
+내가 쓰는 툴 내에서 어떤 함수를 쓰면 데이터들을 목록화해서 보여준다.
+보여주는 이름들이 데이터 그 자체인 건지/ 아니면 얘네들이 이름만 보여주는건지 ?????
+
+
+#-*- coding: utf-8 -*-
+
+import os
+import re
+import traceback
+import hou
+import yaml
+
+from platform import uname
+
+
+_DEBUG_USER = ''
+
+if _DEBUG_USER in (uname()[1], 'everyone'):
+    import pydevd
+    reload(pydevd)
+
+    pydevd.settrace('jonghwan', port=8989, suspend=False)
+
+##########################################################################################
+FX_LIT_OWNER = "/core/Linux/APPZ/3D/houdini/modules/conf/FX_LIT_owner.json"
+
+def get_owner_config_data():
+    try:
+        with open(FX_LIT_OWNER, 'r') as f:
+            data = yaml.safe_load(f)
+            return data #dictionary
+    except IOError, e:
+        hou.ui.displayMessage('IOError')
+        return False
+# FX_LIT =  get_owner_config_data()
+#
+# FX =  FX_LIT["FX"]
+# LIT = FX_LIT["LIT"]
+# hostname = 'geun'
+# if hostname in LIT:
+#     print 'LIT'
+# else:
+#     print 'FX'
+
+
+######################################################################################
+
+'''
+if __name__ in ['__builtin__', 'tyrion.tyrion']:
+    from PySide import QtWidgets
+    from PySide import QtCore
+else:
+    from PyQt4 import QtWidgets
+    from PyQt4 import QtCore
+'''
+# from PyQt5 import QtWidgets, QtGui, QtCore
+try:
+    from hutil.Qt import QtWidgets, QtGui
+    from hutil.Qt import QtCore
+except ImportError:
+    # from Qt import QtWidgets, QtGui
+    # from Qt import QtCore
+    from PyQt5 import QtWidgets, QtGui, QtCore
+
+import json
+import MySQLdb
+from copy import deepcopy
+
+from random import choice
+
+import htool
+
+import fthpatterns as pats
+reload(pats)
+
+import sg_data
+reload(sg_data)
+
+#if not uname()[1] == 'jonghwan':
+#    exit(0)
+
+
+class UserSettings(object):
+    HOME = '%s/tyrion' % os.environ['HOME']
+    PREFERENCE_FILE_NAME = 'preference.conf'
+    USER_PREFERENCE_FILE_PATH = os.path.join(HOME, PREFERENCE_FILE_NAME)
+
+    ADMIN_USERS = ['byungsoo']
+
+
+class EventFilterButton(QtWidgets.QPushButton):
+    def __init__(self):
+        QtWidgets.QPushButton.__init__(self)
+        self.installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        if event.type() == QtCore.QEvent.HoverMove:
+            return True
+        else:
+            return False
+
+        return QtWidgets.QPushButton.eventFilter(self, obj, event)
+
+class TyrionThread(QtCore.QThread):
+    sigWait = QtCore.Signal(bool)
+
+    def __init__(self):
+        QtCore.QThread.__init__(self)
+
+        self.waitMainWindow = True
+
+    def run(self):
+        while self.waitMainWindow:
+            if hou.qt.mainWindow():
+                self.waitMainWindow = False
+        self.sigWait.emit(True)
+
+class TextMovieLabel(QtWidgets.QLabel):
+    def __init__(self, text, fileName):
+        QtWidgets.QLabel.__init__(self)
+        self._text = text
+        self.m = QtGui.QMovie(fileName)
+        self.m.setSpeed(80)
+        self.m.start()
+        self.setMovie(self.m)
+        self.show()
+
+    def setMovie(self, movie):
+        QtWidgets.QLabel.setMovie(self,  movie)
+        img_size = movie.currentImage().size()
+        self._movieWidth = img_size.width()
+        self._movieHeight = img_size.height()
+
+    def paintEvent(self, event):
+        QtWidgets.QLabel.paintEvent(self , event)
+        painter = QtGui.QPainter(self)
+        painter.setFont(self.font())
+        x = self._movieWidth + 6
+        y = (self.height() + painter.fontMetrics().xHeight()) / 2
+        #painter.pdrawText(x, y, self._text)
+        painter.end()
+
+    def sizeHint(self):
+        fnt_metrincs = QtGui.QFontMetrics(self.font())
+        return QtCore.QSize(self._movieWidth + 6 +
+                            fnt_metrincs.width(self._text),
+                            self._movieHeight)
+
+    def setText(self, text):
+        self._text = text
+
+
+class TyrionExceptions(Exception):
+    pass
+
+
+
+
+
+class TyrionDialog(QtWidgets.QDialog):
+    trigger_search = QtCore.Signal()
+
+    def __init__(self, parent=None):
+        super(TyrionDialog, self).__init__(parent)
+
+        self.defaultWindowFlags = self.windowFlags()
+        self.setWindowTitle('Darth Vader')
+
+        label = ['Project', 'Name', 'Pub', 'Status', 'Start', 'End', 'Description', 'Type']
+        self.list_lut_file = '/core/Linux/APPZ/3D/houdini/ocio/list_lut.json'
+
+        self.shotDir = None
+        self.order = {}
+        self.insert_shot = ()
+        self.project_order = []
+        self._hostname = uname()[1]
+        hostname = uname()[1]
+        # hostname = 'geun'
+
+        FX_LIT = get_owner_config_data()
+
+        self.FX = FX_LIT["FX"]
+        self.LIT = FX_LIT["LIT"]
+
+        hlyToolbar = QtWidgets.QHBoxLayout()
+
+        self.edtUser = QtWidgets.QLineEdit()
+        self.edtUser.setText(hostname)
+        self.edtUser.setMaximumWidth(130)
+        if hostname not in UserSettings.ADMIN_USERS:
+            self.edtUser.setReadOnly(True)
+
+        self.btn_reload = QtWidgets.QPushButton()
+        self.btn_reload.setText('Reload')
+        self.btn_reload.setMaximumWidth(150)
+
+
+        vly_user = QtWidgets.QVBoxLayout()
+
+        flyToolbar = QtWidgets.QFormLayout()
+        flyToolbar.setAlignment(QtCore.Qt.AlignRight)
+        flyToolbar.addRow(' User :', self.edtUser)
+
+        self.movie_label = TextMovieLabel('Tyrion Test',
+                                          os.environ['HSITE'] \
+                                          + '/modules/DarthVader/icons/1483223147_giphy.gif')
+
+        self.movie_label.show()
+        fnt_search = QtGui.QFont()
+        fnt_search.setBold(True)
+        #fnt_search.setPointSize(50)
+
+        self.btn_search = QtWidgets.QPushButton()
+        self.btn_search.setFont(fnt_search)
+        self.btn_search.setText('Search : Ctrl + f ')
+
+        self.search_editor = QtWidgets.QLineEdit()
+        self.search_editor.setFont(fnt_search)
+        #self.search_editor.setMinimumHeight(30)
+        self.search_editor.setMaximumWidth(200)
+        self.search_editor.setVisible(False)
+
+        self.chkAutoRecent = QtWidgets.QCheckBox('Recent file')
+        self.chkAutoRecent.setChecked(True)
+
+        vly_user.addWidget(self.btn_reload)
+        spc_item = QtWidgets.QSpacerItem(20, 20,
+                                     QtWidgets.QSizePolicy.Fixed,
+                                     QtWidgets.QSizePolicy.Fixed)
+
+        vly_user.addItem(spc_item)
+        vly_user.addLayout(flyToolbar)
+        vly_user.addWidget(self.btn_search)
+        vly_user.addWidget(self.search_editor)
+        vly_user.addWidget(self.chkAutoRecent)
+
+        hlyToolbar.addWidget(self.movie_label)
+        hlyToolbar.addLayout(vly_user)
+
+
+
+
+
+        ## tree
+        self.treMain = self.createTreeWidget(labels=label)
+        ##  hide 'Type' column
+        self.treMain.setColumnHidden(len(label)-1, True)
+
+
+        vlyMain = QtWidgets.QVBoxLayout()
+        vlyMain.addLayout(hlyToolbar)
+        vlyMain.addWidget(self.treMain)
+        self.setLayout(vlyMain)
+
+        #
+        settings = self.load_settings(UserSettings.USER_PREFERENCE_FILE_PATH)
+        self.reload_task(settings)
+
+		# 버튼 처리에 대한 로직 ( 포커싱 및 디자인 적인 처리)
+        self.trigger_search.connect(self.search_item)
+        self.btn_search.clicked.connect(self.search_item)
+        self.treMain.itemDoubleClicked.connect(self.onDoubleClicked_item)
+        self.edtUser.returnPressed.connect(self.on_clicked_btn_reload)
+        self.btn_reload.clicked.connect(self.on_clicked_btn_reload)
+        self.search_editor.textEdited.connect(self.search_auto)
+        self.search_editor.returnPressed.connect(self.on_searched_item)
+
+
+
+
+
+    def start_job(self):
+        extern_key = 'SHOT_CODE'
+        shot_code = self.get_shot_code_from_env(extern_key)
+        if shot_code:
+            self.open_workspace(shot_code)
+
+    def get_shot_code_from_env(self, key):
+        shot_code = os.environ.get(key)
+        if shot_code:
+            os.environ[key] = ''
+        return shot_code
+
+    def open_workspace(self, shot_code):
+        self.search_item()
+        self.search_editor.setText(shot_code)
+        self.search_auto(shot_code)
+
+        item = self.treMain.findItems(shot_code,
+                                      QtCore.Qt.MatchContains |
+                                      QtCore.Qt.MatchRecursive,
+                                      1)
+        self.onDoubleClicked_item(item[-1], None)
+
+    def closeEvent(self, e):
+        self.save_settings(UserSettings.USER_PREFERENCE_FILE_PATH)
+
+        self.setParent(None)
+        e.accept()
+        # QtWidgets.QDialog.closeEvent(e)
+
+    def keyPressEvent(self, e):
+        if e.key() == QtCore.Qt.Key_Escape:
+            e.ignore()
+        else:
+            e.accept()
+        # return QtWidgets.QDialog.keyPressEvent(e)
+
+        if e.modifiers() == QtCore.Qt.ControlModifier:
+            if e.key() == QtCore.Qt.Key_F:
+                self.trigger_search.emit()
+                return
+
+        super(TyrionDialog, self).keyPressEvent(e)
+
+    def tmpLog(self, hostName, txt='init'):
+        log = '/core/tmp/tyrion.log'
+        # os.system('echo `date` : `hostname` : %s >> %s' % (txt, log))
+        os.system('echo `date` : `hostname` : %s ' % txt)
+
+    def sort_task(self, records, prj_keys):
+        if prj_keys == None:
+            prj_keys = []
+        # print prj_keys, type(prj_keys)
+        # return None
+        ## sort - last opened ( by self.order )
+        new_records = []
+        records = list(records)
+
+        for prj_key in prj_keys:
+            if not self.order.get(prj_key):
+                continue
+            for shot in self.order[prj_key]:
+                indexes = self._find_in_sublists(records, (prj_key, shot))
+                if indexes:
+                    # new_records.append(records[indexes[0]])
+                    new_records.append(records.pop(indexes[0]))
+
+        new_records = new_records + records
+        prj_order = []
+        for new_record in new_records:
+            if not prj_order.count(new_record[0]):
+                prj_order.append(new_record[0])
+            else:
+                continue
+        self.project_order = prj_order
+
+        ## sort - end
+
+        return new_records
+
+    def reload_task(self, settings):
+        self.treMain.clear()
+
+        # records = self.getTaskFromWave(str(self.edtUser.text()).strip())
+        records = self.get_tasks(str(self.edtUser.text()).strip())
+
+        new_records = self.sort_task(records, self.project_order)
+
+        # if records:
+        if new_records:
+            self.setItems(tuple(new_records))
+        else:
+            self.setItems(records)
+        '''
+        prj_item = self.treMain.findItems('SY',
+                               QtCore.Qt.MatchExactly |
+                                          QtCore.Qt.MatchRecursive,
+                                          0)[0]
+        print prj_item.text(0)
+        self.treMain.insertTopLevelItem(0, prj_item)
+        #self.treMain.takeTopLevelItem()
+        '''
+        ##
+        if settings:
+            settings.beginGroup('Expanded')
+            for x in range(self.treMain.topLevelItemCount()):
+                item = self.treMain.topLevelItem(x)
+                try:
+                    item.setExpanded(int(settings.value(item.text(0))))
+                except TypeError:
+                    continue
+            settings.endGroup()
+
+    def on_clicked_btn_reload(self):
+        settings = self.load_settings(UserSettings.USER_PREFERENCE_FILE_PATH)
+        self.reload_task(settings)
+
+    def toggle_search_box(self, search_flag):
+        self.btn_search.setVisible(not search_flag)
+        self.search_editor.setVisible(search_flag)
+        if search_flag:
+            pass
+
+    def search_item(self):
+        self.toggle_search_box(True)
+        self.search_editor.setFocus()
+
+    def on_searched_item(self):
+        self.onDoubleClicked_item(self.treMain.currentItem(), None)
+
+    def search_auto(self, cur_str):
+        if cur_str.count(' '):
+            cur_str = cur_str.replace(' ', '_')
+        item = self.treMain.findItems(cur_str,
+                                      QtCore.Qt.MatchContains |
+                                      QtCore.Qt.MatchRecursive,
+                                      1)
+        if item:
+            self.treMain.clearSelection()
+            self.treMain.setCurrentItem(item[0])
+
+    def onDoubleClicked_item(self, *args):
+
+        if self._hostname in self.FX:
+            item = args[0]
+            print 'items :', item.text(0)
+            if item.text(0) == 'RND':
+                return False
+
+            if not item.text(0):
+                prj_code = item.parent().text(0)
+            else:
+                prj_code = item.text(0)
+
+            self.shotDir = '/show/%s/seq/%s/%s' % (
+                prj_code, item.text(1).split('_')[0], item.text(1))
+            self.makeTaskDirectory(prj_code, item.text(1))
+
+            hipDir = self.getHipDirectory(prj_code, item.text(1), item.text(7))
+
+            shot = item.text(1)
+            shot_split = shot.split('_')
+            filePrefix = ''
+            for each in shot_split:
+                filePrefix = filePrefix + each + '_'
+            ## KE_029_ , KE_029_01_
+
+            # if not :
+            #    self.setModal(False)
+            #    hou.ui.displayMessage('No HIP saved.')
+            #    self.setModal(True)
+            #    return False
+
+            if not os.path.exists(hipDir) or \
+                    not self.existsWorkingHip(hipDir, filePrefix):
+                newHipPath = '%s/%sfx_v001.hip' % (hipDir, filePrefix)
+                if not os.path.exists(hipDir):
+                    os.makedirs(hipDir)
+
+                self.makeNewHip(newHipPath, int(item.text(4)), int(item.text(5)))
+                if prj_code != 'RND':
+                    self.insert_shot = (prj_code, item.text(1))
+                self.close()
+            else:
+                if self.chkAutoRecent.isChecked():
+                    hipFile = self.getRecentShotFile(hipDir)
+                else:
+                    hipFile = hou.ui.selectFile(
+                        hipDir,
+                        pattern='%sfx_v???.hip' % filePrefix
+                    )
+                if hipFile:
+                    if os.path.exists(hipFile):
+                        if prj_code != 'RND':
+                            self.insert_shot = (prj_code, item.text(1))
+                        # self.close()
+
+                        hou.hipFile.load(hipFile)
+
+                        self.load_lut(prj_code)
+                        self.set_metadata()
+                        self.close()
+                    else:
+                        hou.ui.displayMessage('Invalid hip file.')
+                else:
+                    # hou.ui.displayMessage('No hip file.')
+                    # self.setModal(True)
+                    # return False
+                    # self.close()
+                    pass
+            # self.setModal(True)
+            self.activateWindow()
+
+        if self._hostname in self.LIT:
+
+            item = args[0]
+            print 'items :', item.text(0)
+            if item.text(0) == 'RND':
+                return False
+
+            if not item.text(0):
+                prj_code = item.parent().text(0)
+            else:
+                prj_code = item.text(0)
+
+            self.shotDir = '/show/%s/seq/%s/%s' % (
+                prj_code, item.text(1).split('_')[0], item.text(1))
+            self.makeTaskDirectory(prj_code, item.text(1))
+
+            hipDir = self.getHipDirectory(prj_code, item.text(1), item.text(7))
+
+            shot = item.text(1)
+            shot_split = shot.split('_')
+            filePrefix = ''
+            for each in shot_split:
+                filePrefix = filePrefix + each + '_'
+            ## KE_029_ , KE_029_01_
+
+            # if not :
+            #    self.setModal(False)
+            #    hou.ui.displayMessage('No HIP saved.')
+            #    self.setModal(True)
+            #    return False
+
+            if not os.path.exists(hipDir) or \
+                    not self.existsWorkingHip(hipDir, filePrefix):
+                newHipPath = '%s/%slit_v01_w01.hip' % (hipDir, filePrefix)
+                if not os.path.exists(hipDir):
+                    os.makedirs(hipDir)
+
+                self.makeNewHip(newHipPath, int(item.text(4)), int(item.text(5)))
+                if prj_code != 'RND':
+                    self.insert_shot = (prj_code, item.text(1))
+                self.close()
+            else:
+                if self.chkAutoRecent.isChecked():
+                    hipFile = self.getRecentShotFile(hipDir)
+                else:
+                    hipFile = hou.ui.selectFile(
+                        hipDir,
+                        pattern='%slit_v??_w??.hip' % filePrefix
+                    )
+                if hipFile:
+                    if os.path.exists(hipFile):
+                        if prj_code != 'RND':
+                            self.insert_shot = (prj_code, item.text(1))
+                        # self.close()
+
+                        hou.hipFile.load(hipFile)
+
+                        self.load_lut(prj_code)
+                        self.set_metadata()
+                        self.close()
+                    else:
+                        hou.ui.displayMessage('Invalid hip file.')
+                else:
+                    # hou.ui.displayMessage('No hip file.')
+                    # self.setModal(True)
+                    # return False
+                    # self.close()
+                    pass
+            # self.setModal(True)
+            self.activateWindow()
+
+
+
+
+    def set_metadata(self):
+        item = self.treMain.currentItem()
+        start_frame = item.text(4)
+        hou.hscript('setenv SSTART={}'.format(start_frame))
+
+    def load_lut(self, project_code):
+        data = self._get_lut_list(self.list_lut_file)
+        if data.has_key(project_code) and data[project_code].has_key('lutFile'):
+            lut_file = data[project_code]['lutFile']
+
+            htool.loadLut(lut_file)
+            return lut_file
+        else:
+            htool.resetLut(2.2)
+            return False
+
+    def _get_lut_list(self, list_lut_file_path):
+        import json
+        with open(list_lut_file_path, 'r') as f:
+            data = json.loads(f.read())
+        return data
+
+    def get_shot_list(self, top_level_item_list):
+        shot_all_dict = {}
+
+        for top_level_item in top_level_item_list:
+            prj = str(top_level_item.text(0))
+            if prj == 'RND':
+                continue
+
+            shot_list_by_prj = []
+
+            count = top_level_item.childCount()
+
+            for x in range(count):
+                shot_list_by_prj.append(str(top_level_item.child(x).text(1)))
+
+            shot_all_dict[prj] = shot_list_by_prj
+            if self.insert_shot:
+                if prj == self.insert_shot[0]:
+                    if shot_list_by_prj.count(self.insert_shot[1]):
+                        pop_item = shot_list_by_prj.pop(
+                            shot_list_by_prj.index(self.insert_shot[1])
+                        )
+                        shot_list_by_prj.insert(0, pop_item)
+
+                        insert_prj = self.project_order.pop(
+                            self.project_order.index(self.insert_shot[0])
+                        )
+                        self.project_order.insert(0, insert_prj)
+        return shot_all_dict
+
+    def save_settings(self, setting_file_path):
+        prj_order = []
+        user_settings = QtCore.QSettings(setting_file_path,
+                                         QtCore.QSettings.IniFormat)
+        user_settings.beginGroup('General')
+        user_settings.setValue('auto_recent', int(self.chkAutoRecent.isChecked()))
+        user_settings.endGroup()
+
+        top_lv_items = []
+        user_settings.beginGroup('Expanded')
+        for x in range(self.treMain.topLevelItemCount()):
+            item = self.treMain.topLevelItem(x)
+            top_lv_items.append(item)
+            user_settings.setValue(item.text(0),
+                                   int(item.isExpanded())
+                                   )
+        user_settings.endGroup()
+        user_settings.beginGroup('Order')
+        shot_list = self.get_shot_list(top_lv_items)
+        user_settings.setValue('project_order', self.project_order)
+        for key in shot_list.keys():
+            user_settings.setValue(key, shot_list[key])
+        user_settings.endGroup()
+
+    def load_settings(self, setting_file_path):
+        if not os.path.exists(setting_file_path):
+            return
+        user_settings = QtCore.QSettings(setting_file_path,
+                                         QtCore.QSettings.IniFormat)
+        try:
+            user_settings.beginGroup('General')
+            self.chkAutoRecent.setChecked(
+                int(user_settings.value('auto_recent'))
+            )
+            user_settings.endGroup()
+
+            user_settings.beginGroup('Order')
+            for prj in user_settings.childKeys():
+                if prj == 'project_order':
+                    self.project_order = user_settings.value(prj)
+                else:
+                    self.order[prj] = user_settings.value(prj)
+
+            user_settings.endGroup()
+
+            '''
+            if self.order:
+                print 'load : %d project : on' % len(self.order)
+            else:
+                print 'load : project : off'
+
+
+            user_settings.beginGroup('Expanded')
+            for x in range(self.treMain.topLevelItemCount()):
+                item = self.treMain.topLevelItem(x)
+                item.setExpanded(int(user_settings.value(item.text(0))))
+            user_settings.endGroup()
+            '''
+
+            return user_settings
+
+        except Exception:
+            traceback.print_exc()
+
+    def _find_in_sublists(self, iters, tuple_value):
+        '''
+            return : (index, sub_index)
+        '''
+
+        for i, sublist in enumerate(iters):
+            try:
+                if sublist[0:2] == tuple_value:
+                    return (i, sublist.index(tuple_value[1]))
+                continue
+            except ValueError:
+                continue
+
+        # raise ValueError('%s is not in lists' % val)
+        return None
+
+    def getRecentShotFile(self, hipDir):
+        wipFiles = []
+        hips = os.listdir(hipDir)
+        for hip in hips:
+            if re.match(pats.fileName('fx'), hip):
+                wipFiles.append(os.path.join(hipDir, hip))
+
+            if re.match(pats.fileName('lit'), hip):
+                wipFiles.append(os.path.join(hipDir, hip))
+
+        return max(wipFiles, key=os.path.getctime)
+
+    def initHip(self, startF=1001, endF=1690, cam_file=''):
+
+        try:
+            ## set frame range
+            htool.setFrameRange(startF, endF)
+            hou.setFrame(startF)
+        except Exception, e:
+            print 'Error : Fram Range', e
+
+        try:
+            ## set FPS : from shot data:
+            fps = htool.get_fps_from_shot_data()
+            hou.setFps(fps)
+        except Exception, e:
+            print 'Error : FPS', e
+
+        try:
+            ## import camera
+            if cam_file:
+                htool.build_alembic_cam(cam_file)
+                # htool.buildFbxCam(camFilePath)
+        except Exception, e:
+            print 'Error : Camera', e
+
+        try:
+            # scene set NEW
+            htool.build_scene_set()
+        except Exception, e:
+            print 'Error : scene', e
+
+    def makeDir(self, dic, root):
+        for x in dic.keys():
+            r2 = root + '/' + x
+            if dic[x]:
+                self.makeDir(dic[x], r2)
+            else:
+                if not os.path.exists(r2):
+                    os.makedirs(r2)
+                continue
+
+    def makeTaskDirectory(self, prj, shot):
+        shotdir = hou.getenv('SHOTDIR')
+        # if shotdir:
+
+
+        if self._hostname in self.FX:
+
+            seq = shot.split('_')[0]
+            wipDirs = {'preview': {'IMG': {}, 'MOV': {}},
+                       'scenes': {'cache': {}, 'images': {}}
+                       }
+
+            pubDirs = {'cache': {}, 'source': {}}
+            rndDirs = {'fx': {}}
+            cacheDirs = {prj: {seq: {shot: {}}}}
+
+            show = '/show/%s/seq/%s/%s/fx' % (prj, seq, shot)
+            rnd = '/show/%s/assets' % (prj)
+            fx = '/AZstorage/cache'
+
+            self.makeDir(wipDirs, show + '/wip')
+            self.makeDir(pubDirs, show + '/pub')
+            self.makeDir(rndDirs, rnd)
+            self.makeDir(cacheDirs, fx)
+
+        if self._hostname in self.LIT:
+
+
+
+            seq = shot.split('_')[0]
+            wipDirs = {'preview': {'IMG': {}, 'MOV': {}},
+                       'scenes': {}
+                       }
+
+            # pubDirs = {'cache': {}, 'source': {}}
+            # rndDirs = {'fx': {}}
+            # cacheDirs = {prj: {seq: {shot: {}}}}
+
+            show = '/show/%s/seq/%s/%s/lit' % (prj, seq, shot)
+            # rnd = '/show/%s/assets' % (prj)
+            # fx = '/AZstorage/cache'
+
+            self.makeDir(wipDirs, show + '/wip')
+            # self.makeDir(pubDirs, show + '/pub')
+            # self.makeDir(rndDirs, rnd)
+            # self.makeDir(cacheDirs, fx)
+
+
+
+
+
+
+    def getLastTakeFile(self, shotDir):
+        takeDir = shotDir + '/Take'
+
+        if not os.path.exists(takeDir):
+            os.makedirs(takeDir)
+
+        takeFiles = sorted(os.listdir(takeDir))
+        if takeFiles:
+            while (1):
+                lastTakeFileName = takeFiles.pop()
+                if re.match('^take.%s.json$' % pats.Take.VER, lastTakeFileName):
+                    break
+        else:
+            return False
+        return os.path.join(takeDir, lastTakeFileName)
+
+    ### deprecated -> htool.find_cam_files
+    def findCamFile(self, shotDir, returnList=False):
+        takeFile = self.getLastTakeFile(shotDir)
+        if not takeFile:
+            return False
+        ##
+        aniCamPatt = '%s_ani_v([0-9]{2,3})_w([0-9]{2,3})' % pats.SHOT
+        matCamPatt = '%s_matchmove_v([0-9]{2,3})_w([0-9]{2,3})' % pats.SHOT
+
+        cams = {}
+        camList = []
+        if takeFile and os.path.exists(takeFile):
+            with open(takeFile, 'r') as f:
+                data = json.loads(f.read())
+                if data.has_key('camera') and data['camera'].has_key('objectList'):
+                    cams = data['camera']['objectList'].values()
+
+            for camPy in cams:
+                camList.append(camPy[0].replace('.py', '.abc'))
+            del camPy
+        else:
+            print 'No cam exists.'
+
+        if returnList:
+            return camList
+
+        camAni = []
+        camDefault = []
+        for cam in camList:
+            if re.search(aniCamPatt + '.abc', cam):
+                camAni.append(cam)
+            else:  ## re.search(matCamPatt+'.abc', cam):
+                camDefault.append(cam)
+
+        if camAni:
+            camFile = max(camAni, key=os.path.getctime)
+        elif camDefault:
+            camFile = max(camDefault, key=os.path.getctime)
+        else:
+            ## no cam & error
+            camFile = ''
+
+        return camFile
+
+    def makeNewHip(self, newHipPath, start=1001, end=1240):
+        hou.hipFile.clear(suppress_save_prompt=True)
+        hou.hipFile.save(newHipPath)
+        shotDir = self.shotDir
+        camFilePath = htool.find_cam_files(shotDir)
+        self.initHip(start, end, camFilePath)
+
+        hou.hipFile.save(newHipPath)
+
+    def existsWorkingHip(self, hipDir, hipPrefix):
+
+        if self._hostname in self.FX:
+            defaultPattern = '%sfx_v[0-9]{3,4}.hip' % hipPrefix
+            hipNames = os.listdir(hipDir)
+            for each in hipNames:
+                ## if re.match(defaultPattern, each) or re.match(oldPattern, each):
+                if re.match(defaultPattern, each):
+                    return True
+            return False
+        if self._hostname in self.LIT:
+            defaultPattern = '%slit_v[0-9]{2,4}_w[0-9]{2,4}.hip' % hipPrefix
+            hipNames = os.listdir(hipDir)
+            for each in hipNames:
+                ## if re.match(defaultPattern, each) or re.match(oldPattern, each):
+                if re.match(defaultPattern, each):
+                    return True
+            return False
+
+
+
+    def getHipDirectory(self, prj, shot, taskType):
+
+        if self._hostname in self.FX:
+            ## /show/AR/seq/AH/AH_019/fx/wip/scenes
+            if taskType == 'asset':
+                return '/show/%s/assets/fx/%s/wip/scenes' % (prj, shot)
+            elif taskType == 'shot':
+                return '/show/%s/seq/%s/%s/fx/wip/scenes' % (prj, shot.split('_')[0], shot)
+            else:
+                print 'Invalid task type'
+                return None
+
+        if self._hostname in self.LIT:
+            ## /show/AR/seq/AH/AH_019/fx/wip/scenes
+            if taskType == 'asset':
+                return '/show/%s/assets/lit/%s/wip/scenes' % (prj, shot)
+            elif taskType == 'shot':
+                return '/show/%s/seq/%s/%s/lit/wip/scenes' % (prj, shot.split('_')[0], shot)
+            else:
+                print 'Invalid task type'
+                return None
+
+    def _is_top_level_item(self, item):
+        if item.parent():
+            return False
+        else:
+            return True
+
+    def get_project_item(self, prj_code, prj_name):
+        if prj_name is None:
+            prj_name = ''
+        prj_items = self.treMain.findItems(prj_code,
+                                           QtCore.Qt.MatchExactly |
+                                           QtCore.Qt.MatchRecursive,
+                                           0)
+        if not prj_items:
+            prj_item = QtWidgets.QTreeWidgetItem()
+            prj_item.setText(0, prj_code)
+            prj_item.setText(6, '\n' + prj_name + '\n')
+            self.treMain.addTopLevelItem(prj_item)
+        else:
+            prj_item = None
+            for item in prj_items:
+                if self._is_top_level_item(item):
+                    prj_item = item
+                    break
+        return prj_item
+
+    def createTreeWidget(self, **kwargs):
+        # datas = kwargs['datas']
+        labels = kwargs['labels']
+
+        tree = QtWidgets.QTreeWidget()
+        tree.setColumnCount(len(labels))
+        tree.setHeaderLabels(labels)
+
+        tree.setRootIsDecorated(False)
+        tree.setAnimated(True)
+        tree.setRootIsDecorated(True)
+        tree.setAlternatingRowColors(True)
+        tree.header().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeToContents)
+
+        # tree.setSortingvEnabled(True)
+
+        # tree.header().setStretchLastSection(True)
+        # tree.setUniformRowHeights(True)
+
+        # self.setItems(tree, datas)
+
+        # print tree.doItemsLayout()
+        return tree
+
+    def add_shot_item(self, datas, item_rnd=None):
+        ex_stats = ['omit']
+        orange = QtGui.QBrush(QtGui.QColor(255, 165, 0))
+        rust = QtGui.QBrush(QtGui.QColor(139, 64, 0))
+        for ix, data in enumerate(datas):
+            item = QtWidgets.QTreeWidgetItem()
+            data = list(data)
+
+            if not os.path.exists('/show/%s' % data[0].upper()):
+                continue
+
+            if not data[7] == 'asset':
+                shotDir = '/show/%s/seq/%s/%s' % (
+                    data[0], data[1].split('_')[0], data[1]
+                )
+                stframe, edframe = htool.get_frame_range(shotDir)
+
+                data[4] = stframe
+                data[5] = edframe
+
+            for i, val in enumerate(data):
+                # if i == 7:
+                #    break
+
+                if i in (0, 1):
+                    fnt = self.treMain.font()
+                    fnt.setPointSize(9)
+                    fnt.setBold(True)
+                    # item.setForeground(i, rust)
+                else:
+                    fnt.setBold(False)
+
+                if i == 6:
+                    if val:
+                        new_val = val.replace('\n\r', '').replace('\r', '')
+                        item.setText(i,
+                                     '\n' + new_val + '\n')
+                        # item.setText(i, '\n' + val.replace('\n\r', '').replace(
+                        #    '\r', '') + '\n')
+                    else:
+                        item.setText(i, '\n\n')
+                else:
+                    if i == 0:
+                        continue
+                    item.setText(i, str(val))
+
+                item.setFont(i, fnt)
+
+            if data[3] in ex_stats:
+                item.setForeground(1, rust)
+                item.setForeground(3, rust)
+
+            if data[7] == 'asset':
+                item_rnd.addChild(item)
+            else:
+                prj_item = self.get_project_item(data[0], data[8])
+                prj_item.addChild(item)
+
+                # self.treMain.addTopLevelItem(item)
+
+    def get_frame_range(self, take_file):
+        key_name = 'frameRange'
+        # sub_key_name = 'frame'
+        sub_key_name = 'updateList'
+
+        if take_file and os.path.exists(take_file):
+            with open(take_file, 'r') as f:
+                data = json.loads(f.read())
+                if data.has_key(key_name) \
+                        and data[key_name].has_key(sub_key_name):
+                    # frames = data[key_name][sub_key_name].values()[0]
+                    frames = data[key_name][sub_key_name].keys()[0]
+                    frames = frames.split('-')
+                    return int(frames[0]), int(frames[1])
+
+        return (0, 0)
+
+    def setItems(self, datas):
+        fnt = self.treMain.font()
+        fnt.setPointSize(9)
+        fnt.setBold(True)
+        self.treMain.setFont(fnt)
+
+        if not datas:
+            # print datas
+            item = QtWidgets.QTreeWidgetItem()
+
+            item.setText(6, 'No Task')
+            self.treMain.addTopLevelItem(item)
+            self.setWindowFlags(self.defaultWindowFlags)
+            return
+
+        # orange = QtWidgets.QBrush(QtWidgets.QColor(255,150,0))
+        # orange = QtWidgets.QBrush(QtWidgets.QColor(0,102,102))
+        # orange = QtWidgets.QBrush(QtWidgets.QColor(102,0,0))
+        orange = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+
+        itemRnd = QtWidgets.QTreeWidgetItem()
+        itemRnd.setText(0, 'RND')
+        itemRnd.setText(6, '\nRhythm & Dance\n')
+        itemRnd.setFont(0, fnt)
+        itemRnd.setFont(6, fnt)
+        self.treMain.addTopLevelItem(itemRnd)
+        # print itemRnd.text(0)
+
+        self.add_shot_item(datas, itemRnd)
+
+        '''
+        for ix, data in enumerate(datas):
+            item = QtWidgets.QTreeWidgetItem()
+
+            for i, val in enumerate(data):
+                #if i == 7:
+                #    break
+
+                if i in (0,1):
+                    fnt.setBold(True)
+                    #item.setForeground(i, orange)
+
+                else:
+                    fnt.setBold(False)
+
+                if i == 6:
+                    item.setText(i, '\n'+val.replace('\n\r', '').replace('\r','')+'\n' )
+                else:
+                    item.setText(i,str(val))
+                item.setFont(i, fnt)
+
+            if data[7] == 'asset':
+                itemRnd.addChild(item)
+            else:
+                tree.addTopLevelItem(item)
+                #print 'bg:',item.background(0)
+
+            #item.setFont(ix, fnt)
+            #sz = item.sizeHint(ix)
+            #print 'sz %d:' % ix,sz
+            #item.setSizeHint(ix, QtCore.QSize(sz.width(),sz.height()+25))
+        '''
+
+    def setRNDItem(self):
+        pass
+
+    def get_tasks(self, hostname):
+        # records_wv = self.getTaskFromWave(hostname)
+
+        records_sg = self.get_task_from_shotgun(hostname)
+        return records_sg  # + records_wv
+
+    def whatisthis(self, s):
+        if isinstance(s, str):
+            print "ordinary string"
+        elif isinstance(s, unicode):
+            print "unicode string"
+        else:
+            print "not a string"
+
+    def get_task_type(self, shot_name):
+        if re.match(pats.SHOT, shot_name):
+            return 'shot'
+        else:
+            return 'asset'
+
+    def get_task_from_shotgun(self, hostname):
+        records = []
+        sg_find = sg_data.SGFind()
+        datas = sg_find.sg_get_assigned_tasks(hostname)
+
+        for each in datas:
+            shot_name = each.get('entity')
+            if shot_name:
+                shot_name = unicode(shot_name, 'utf-8')
+                # self.whatisthis(shot_name)
+
+                task_type = self.get_task_type(shot_name)
+
+            frame_range = each.get('entity.Shot.sg_frame')
+            if frame_range:
+                start, end = frame_range.split('-')
+            else:
+                start, end = ('1', '100')
+
+            desc = each.get('entity.Shot.sg_cg_description')
+            if desc:
+                # desc = desc.decode('utf-8').encode('utf-8')
+                # desc = unicode(desc, 'utf-8')
+                desc = desc.decode('utf8')
+                # self.whatisthis(desc)
+
+            real_name = each.get('project.Project.sg_project_id')
+            if real_name:
+                real_name = unicode(real_name, 'utf-8')
+
+            record = (each.get('project'),
+                      shot_name,
+                      str(each.get('entity.Shot.sg_status_list')),
+                      each.get('sg_status_list'),
+                      int(start),
+                      int(end),
+                      # each.get('entity.Shot.sg_cg_description'),
+                      desc,
+                      task_type,
+                      real_name)
+
+            records.append(record)
+        # sg_data.pprint2(records)
+        return tuple(records)
+
+    def getTaskFromWave(self, hostName):
+        # if hostName == 'jonghwan':
+        #    hostName = 'chan'
+        # hostName = 'hosung'
+        # wHost = '192.168.40.200'
+        wHost = '192.168.10.124'
+        wUser = 'megatron'
+        wPass = '2544'
+        wSchm = 'wave' # 
+        wPort = 3306
+        wChset = 'utf8'
+
+        db = MySQLdb.connect(wHost, wUser, wPass, wSchm,
+                             port=wPort, charset=wChset)
+        cursor = db.cursor()
+
+        # sqlStats = '''SELECT wt.project_code
+        #                    , wt.shot_name
+        #                    , wt.pub_status
+        #                    , ws.status
+        #                    , ws.start_frame
+        #                    , ws.end_frame
+        #                    , ws.cg_desc
+        #                    , wt.task_type
+        #                FROM wa_task as wt
+        #                INNER JOIN wa_shot as ws
+        #                    ON wt.shot_name = ws.shot_name
+        #                        AND wt.project_code = ws.project_code
+        #                WHERE wt.user_id1 = "%s"
+        #                    AND not ws.status in ("dir", "omit", "");''' % hostName
+
+        sqlStats = '''SELECT wt.project_code,
+                            wt.shot_name,
+                            wt.pub_status,
+                            ws.status,
+                            ws.start_frame,
+                            ws.end_frame,
+                            ws.cg_desc,
+                            wt.task_type,
+                            ''
+                        FROM wa_task wt
+                        INNER JOIN wa_shot ws ON wt.shot_name = ws.shot_name
+                            AND wt.project_code = ws.project_code
+                        INNER JOIN wa_project wp ON wt.project_code = wp.project_code
+                        WHERE wt.user_id1 = "{0}"
+                            AND ws.status not in ("dir","omit","")
+                            AND wp.status not in ("Completed")
+
+                        UNION ALL
+
+                        SELECT wt.project_code
+                            , wt.asset_name
+                            , wt.pub_status
+                            , wa.status
+                            , 1001
+                            , 1240
+                            , wa.cg_desc
+                            , wt.task_type
+                            , ''
+                        FROM wa_task wt
+                        INNER JOIN wa_asset wa ON wt.asset_name = wa.asset_name
+                           AND wt.project_code = wa.project_code
+                        INNER JOIN wa_project wp ON wt.project_code = wp.project_code
+                        WHERE wt.user_id1 = "{0}"
+                           AND wa.status not in ("dir","omit","")
+                            AND wp.status not in ("Completed");'''.format(hostName)
+
+        cursor.execute(sqlStats)
+
+        records = cursor.fetchall()
+        # sg_data.pprint2(records)
+        # sg_data.pprint2(self.get_task_from_shotgun('chan'))
+
+        return records
+
+    def createTreeWidget(self, **kwargs):
+        # datas = kwargs['datas']
+        labels = kwargs['labels']
+
+        tree = QtWidgets.QTreeWidget()
+        tree.setColumnCount(len(labels))
+        tree.setHeaderLabels(labels)
+
+        tree.setRootIsDecorated(False)
+        tree.setAnimated(True)
+        tree.setRootIsDecorated(True)
+        tree.setAlternatingRowColors(True)
+        tree.header().setSectionResizeMode(
+                            QtWidgets.QHeaderView.ResizeToContents)
+
+        return tree
+
+
+
+
+
+
+
+
+def getTyrionDialog():
+    dlg = TyrionDialog() #인스턴스화 
+    dlg.setStyleSheet( hou.ui.qtStyleSheet() )
+    dlg.resize(1000, 900)
+    hWin = hou.ui.mainQtWindow()
+    # dlg.setParent(hWin, QtCore.Qt.Window)
+    # icon = hWin.windowIcon()
+    # dlg.setIcon(icon)
+    # dlg.setModal(True)
+    return dlg
+    # dlg.show()
+
+    # dlg.show()
+
+
+
+print 'name :', __name__
+
+if __name__ == '__main__':
+    dlg = TyrionDialog()
+    # dlg.setStyleSheet( hou.ui.qtStyleSheet() )
+    dlg.resize(1000,900)
+    # dlg.setParent(hou.ui.mainQtWindow(), QtCore.Qt.Window)
+    # dlg.setModal(True)
+    dlg.show()
+
+elif __name__ == '__builtin__':
+    tyrionDlg = getTyrionDialog()
+    # tyrionDlg.setModal(True)
+    tyrionDlg.show()
+
+elif __name__ == 'DarthVader.darthvader':
+    import hdefereval
+
+    tyrion_dlg = getTyrionDialog()
+    # tyrion_dlg.setModal(True)
+    hdefereval.executeDeferred(tyrion_dlg.show)
+    hdefereval.executeDeferred(tyrion_dlg.start_job)
+    hdefereval.executeDeferred(tyrion_dlg.activateWindow)
+

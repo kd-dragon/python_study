@@ -1,0 +1,1 @@
+pyinstaller --noconsole --icon=mozzi.ico --onefile fileOpen.py

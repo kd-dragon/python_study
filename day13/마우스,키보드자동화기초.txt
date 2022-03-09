@@ -1,0 +1,41 @@
+import pyautogui
+import time
+
+pyautogui.moveTo(1178, 201, 2)        #좌표, 수행시간
+
+pyautogui.doubleClick()           #.click(clicks=2, interval=2)
+#pyautogui.click(1178, 201) #해당 좌표로 가서 클릭하기
+
+time.sleep(1)
+
+pyautogui.typewrite('Hello')    #키보드 입력 내용
+pyautogui.typewrite('[enter]')  #키보드 키명령어 - 대괄호 양쪽에입력
+# pyautogui.typewrite(['a','b','c','enter'])
+# pyautogui.typewrite(['abc','enter']) # 오류 : 대괄호는 안에 키를 눌러주는것이다. abc라는 키는 없음
+
+
+
+#################### 이미지 스크리샷 찍고 클릭하기
+
+i = pyautogui.locateOnScreen('9.png')
+
+q = pyautogui.center(i)
+pyautogui.click(q)
+
+
+--------------------------------
+
+
+i = pyautogui.locateCenterOnScreen('9.png')
+pyautogui.click(i)
+
+
+-------------------------------- 스크린샷 만들기
+
+pyautogui.screenshot('1.png', region=(1324,789, 30,30))
+num1 = pyautogui.locateCenterOnScreen('1.png')
+pyautogui.click(num1)
+
+------------ 주의 할점 ---------------
+여러번 클릭할때 엄청난 초스피드로 만들수는 없기때문에
+내 눈에 보이는 클릭정도로 만들수 있다.

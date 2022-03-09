@@ -1,0 +1,54 @@
+# 리스트 표현식 사용하기
+ - 파이썬의 리스트가 특이한 점은 리스트 안에 for 반복문과 if 조건문을 사용할 수 있다.
+ - 리스트 안에 식, for문, if 문 등을 지정하여 리스트를 생성하는 것을 리스트 컴프리헨션(list comprehension)
+   이라고 합니다.
+1) 기본 구문
+a = [i for i in range(10)]
+b = list(i for i in range(10))
+print(a)
+print(b)
+
+2) 연산 추가
+ [i for i in range(10)]에서 맨 앞에 i를 다른 값과 연산할 수 있다. 이 때 연산된 결과가 리스트로 생성되게 됨
+
+c = [i ** 2 for i in range(10)]
+d = list(i + 1000 for i in range(10))
+print(c)
+print(d)
+
+3) if 조건문 사용
+ [식 for 변수 in 리스트 if 조건식]
+ 리스트에서 숫자를 생성한 뒤에 if 조건문에서 특정 숫자만 뽑아내서 리스트를 생성함. 
+
+ex) e = [i for i in range(10) if i%2 == 0] #0~9 숫자 중 2의 배수인 숫자(짝수)로 리스트 생성
+
+복합 연습문제) f = [i + 5 for i in range(10) if i % 2 == 1]  
+답: # 0~9 숫자 중 홀수에 5를 더하여 리스트 생성
+
+
+4) for 반복문과 if 조건문 여러번 사용하기
+구구단 2단~9단
+ex) g = [i * j for j in range(2, 10) for i in range(1, 10)]
+
+- 리스트 표현식에 for가 여러 개 일 때 처리 순서는 뒤에서 앞으로 순이다.
+
+
+# 자주 쓰는 함수 만들기
+1) 리스트의 모든 값이 유니크 즉, 고유 값이면 True 아니면 False를 반환하는 함수를 만드시오.
+- list의 set() 함수를 사용하면 중복 값을 제거할 수 있다.
+
+
+def all_unique(list):
+    if len(list) == len(set(list)):
+        return True
+    else:
+        return False
+
+x = [1,2,3,4,5,6]
+y = [1,2,3,4,4,5]
+
+print(all_unique(x))
+print(all_unique(y))
+
+
+

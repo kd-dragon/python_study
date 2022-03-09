@@ -1,0 +1,84 @@
+
+# 베스트 모델 만들기 (실습)
+- 와인 종류 예측하기 
+: 와인은 빛깔에 따라 맑고 투명한 화이트 와인과 붉은 색을 띠는 레드 와인으로 구분됩니다.
+이번 실습의 데이터는 레드와인 샘플 1,599개 화이트와인 샘플 4,898개를 분석해 만들었습니다.
+
+
+먼저 df_pre 라는 공간에 판다스를 사용하여 csv 파일 데이터를 불러옵니다. 
+header=None 은 칼럼 이름이 없다는 뜻이며, 
+만약 1번째 행이 칼럼 이름이라면 header=0 으로 지정해주면 됩니다.
+
+sample() 함수는 원본 데이터에서 정해진 비율만큼 "랜덤으로 뽑아오는 함수". 
+frac = 1이라고 지정하면 원본 데이터의 100%를 불러오라는 의미입니다.
+frac = 0.5로 지정하면 원본 데이터의 50%를 불러오라는 의미입니다.
+
+원본 데이터를 모두 랜덤으로 불러왔으므로 그 중 처음 5줄을 출력해봅시다.
+print(df.head(5))
+df.info() 로 속성 정보를 알 수 있습니다. 
+
+0~11까지에 해당하는 12개의 속성 (정보)를 가지고 13번째 클래스를 맞추는 과제입니다.
+
+이 정보를 토대로 X, Y값을 정하겠습니다.
+
+dataset = df.values
+X = dataset[:,0:12]
+Y = dataset[:,12]
+
+-- dataset[행,열] , 행은 전체 데이터를 포함이므로 :만 기입. 
+
+이제 딥러닝 모델을 생성합니다. 
+예제에서는 4개의 은닉층을 만들어 각각 30, 12, 8, 1개의 노드를 주었습니다.
+이항 분류 문제이미로 오차함수는 binary_crossentropy 사용
+최적화 함수로는 adam()을 사용합니다. 
+
+#모델 실행
+model.fit(X, Y, epochs=200, batch_size=200) 
+- 전체 샘플 200회 반복, 한번에 입력되는 입력값은 200개씩.
+
+
+다음은 학습한 모델을 저장하기위해 저장 폴더 경로를 설정합시다.
+modelpath="./model/{epoch:02d}-{val_loss:.4f}.hdf5"
+이때 에포크 횟수와 테스트셋 오차값을 이용하여 파일명을 정하면 가독성이 좋습니다.
+
+모델을 업데이트 및 저장하기 위해 ModelCheckpoint() 함수를 불러옵니다.
+checkpointer = ModelCheckpoint(filepath=modelpath
+, monitor='val_loss', verbose=1, save_best_only=True)
+
+참고로 학습 정확도는 acc, 테스트셋 정확도는 val_acc, 학습셋 오차는 loss로
+각각 기록됩니다.
+verbose=1로 정하면 해당 함수의 진행 사항이 출력, 0으로 정하면 출력되지 않습니다.
+save_best_only=True 는 앞서 저장한 모델보다 나아졌을 때만 저장하게 합니다.
+
+#모델 실행 변경
+model.fit(X, Y, validation_split=0.2, epochs=200, batch_size=200
+, callbacks=[checkpointer]) 
+
+-> validation_split은 모델 실행시 데이터셋을 학습셋, 테스트셋을 나눠주는 기능
+예를 들면, 원래 데이터셋이 1000개 이고, fit 함수의 validation_split = 0.2 로 하면, 
+training dataset 은 800개로 하여, training 시키고,
+나머지 200개는 test dataset 으로 사용하여, 모델을 평가하게 된다.
+ 
+### 학습 자동 중단 ###
+학습이 진행될수록 학습셋의 정확도는 올라가지만 "과적합" 때문에 
+테스트셋의 실험 결과는 점점 나빠지게 됩니다.
+
+- 케라스는 이렇게 학습이 진행되어도 테스트셋 오차가 줄어들지 않으면
+학습을 멈추게 하는 EarlyStopping() 함수를 제공합니다.
+
+early_stopping_callback 
+ = EarlyStopping(monitor='val_loss', patience=100)
+
+
+
+
+
+
+
+
+
+
+
+
+
+

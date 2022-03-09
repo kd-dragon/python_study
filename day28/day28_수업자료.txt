@@ -1,0 +1,148 @@
+#파이썬 함수
+
+1) 내장 함수: 라이브러리에 미리 만들어 놓은 함수
+
+2) 사용자 정의 함수: 사용자가 직접 정의하여 사용할 수 있는 함수
+	def add(a, b):
+		sum = a + b 
+		return sum 
+		
+
+  [1] 함수로 전달되는 변수가 없을 수도 있다.
+  [2] 돌려줄 값이 없는 경우 return 문이 없을 수도 있다. 
+  [3] return 내용으로는 '값' 과 '수식' 모두 들어갈 수 있다.
+ 
+===========================================================
+playbot 사용하기
+1) 기본 내장함수 사용해보기
+	move() 앞으로 한칸이동
+	turn_left() 왼쪽으로 90도 회전
+	turn_off() 로봇 전원끄기
+	popup(string text) 파라미터 내용을 팝업 창으로 출력
+	say(string text) 말풍선으로 내용 출력
+	repeat(string command, int count) 명령어(함수이름)을 지정된 횟수 만큼 반복 실행 
+	get_random(int num1, int num2) num1과 num2 사이의 임의의수를 골라준다
+
+2) turn_right 함수 만들기
+
+	def turn_right():
+		turn_left()
+		turn_left()
+		turn_left()
+
+	move()
+	turn_left()
+	move()
+	turn_right()
+	move()
+	turn_off()
+
+3) 함수를 이용해서 최대한 적은 소스코드로 월드를 크게 한 바퀴 돌아보세요!
+   다 돌고나서 로봇이 "도착!" 이라고 말풍선 달기
+   
+	move x 9번  
+	turn_left()
+	move x 9번
+	turn_left()
+	move x 9번
+	turn_left()
+	move x 9번
+   
+	-> repeat("move()", 9)
+	-> turn_left()
+   
+	# 새로운 명령어를 만드는 공간
+	def my_repeat():
+		repeat("move()", 9)
+		turn_left()
+
+
+	# 명령어를 실행하는 공간
+	say("출발!")
+	repeat("my_repeat()", 4)
+	popup("도착하였습니다!")
+	
+4) 지그재그 움직이기! ( front_is_clear() -> 앞쪽에 장애물이 있는지 알아내기, get_y(): y좌표 알아내기)
+
+def my_repeat():
+	
+	if get_y() % 2 != 0 :
+		repeat("move()", 9)
+		turn_left()
+		if front_is_clear() :
+			move()
+		else :
+			return 
+		turn_left()
+	else : 
+		repeat("move()", 9)
+		turn_right()
+		if front_is_clear() :
+			move()
+		else :
+			return 
+		turn_right()
+	
+def turn_right():
+	turn_left()
+	turn_left()
+	turn_left()	
+		
+
+# 명령어를 실행하는 공간
+say("출발!")
+repeat("my_repeat()", 10)
+	
+
+
+==============================================================
+매개변수 함수
+
+def sum(a, b, c, d, e):
+	return a+b+c+d+e
+	
+print(sum(1,2,3,4,5))
+
+
+--> 파라미터(인자) 수가 많아지면 매우 불편하므로 *args 로 받으면 편하다! 
+# *args, *asdfsfdsa, *myNames 라고 적어도된다.
+def sum_args(*args): 
+
+	print(f"args={args}, type={type(args)}")
+	
+	cnt = 0
+    for x in args:
+        cnt += x
+    return cnt
+
+
+# 키워드 매개변수 ! **kwargs
+def keys(**kwargs):
+    print(f"args={kwargs}, type={type(kwargs)}")
+    for key, value in kwargs.items():
+        print(f"{key} is {value}")
+
+우리가 사용하는 내장 함수중에 kwargs 
+help(print)
+
+
+# 매개변수 우선순위! 
+일반변수 > *args > **kwargs
+
+1)일반변수 + *args (오류)
+def priority_args(*value, name):
+    print(f"name={name}, value={value}")
+	
+2)일반변수 + **kwargs (오류)
+def priority_kwargs(name, **kwargs)
+	print(f"name={name}, kwargs={kwargs}")
+    for key, value in kwargs.items():
+        print(f"{key} is {value}")
+
+3)일반변수 + *args + **kwargs 
+def priority_args_kwargs(name, *args, **kwargs):
+    print(f"name={name}, args={args},kwargs={kwargs}")
+    for key, value in kwargs.items():
+        print(f"{key} is {value}")
+
+

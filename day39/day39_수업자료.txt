@@ -1,0 +1,91 @@
+https://hangeul.naver.com/2017/nanum
+
+========================================================================
+
+from ursina import *
+
+app = Ursina()
+
+# 윈도우 창 경계 생성
+window.borderless = False
+# 윈도우 창 색 설정
+window.color = color.light_gray
+
+#한글 폰트가져오기
+Text.default_font='./font/NanumGothicCodingBold.ttf'
+
+number = 0
+button1 = Button(text=str(number), color=color.random_color(), scale=0.2, x=0)
+button2 = Button(text="초기화", color=color.random_color(), scale=0.2, x=0.2)
+
+
+# 버튼을 클릭했을 때 이벤트 핸들러 함수
+def number_increase():
+    global number
+    number += 1
+
+
+def initialize():
+    global number
+    number = 0
+
+
+button1.on_click = number_increase
+button2.on_click = initialize
+
+
+# 매 프레임마다 자동으로 동작
+def update():
+    button1.text = str(number)
+
+
+app.run()
+
+==================================================================
+
+
+from ursina import *
+
+
+class PlayButton():
+
+    def __init__(self, val_x):
+
+        self.number = random.randint(1, 10)
+        self.button = Button(
+            text=str(self.number),
+            color=color.random_color(),
+            scale=0.2,
+            x=val_x
+        )
+
+        self.button.on_click = self.number_decrease
+
+    def number_decrease(self):
+        if self.number <= 1:
+            self.button.disable()
+        else:
+            self.number -= 1
+            self.button.text = str(self.number)
+
+
+
+
+app = Ursina()
+
+# 윈도우 창 경계 생성
+window.borderless = False
+# 윈도우 창 색 설정
+window.color = color.light_gray
+
+#한글 폰트가져오기
+Text.default_font='./font/NanumGothicCodingBold.ttf'
+
+button1 = PlayButton(0)
+button2 = PlayButton(0.2)
+button3 = PlayButton(0.4)
+
+
+app.run()
+
+========================================================

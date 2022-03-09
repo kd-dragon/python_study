@@ -1,0 +1,37 @@
+import matplotlib.pyplot as plt
+import cv2
+import os
+
+
+def nine_img():
+
+    img_list = []
+
+    PATH = os.path.dirname(os.path.abspath(__file__))     # 현재파일의 절대경로를 가져옴
+
+    dir_name = os.path.join(PATH, "imgs") # join 메소드로 미리 만들어둔 imgs의 경로를 설정
+
+    file_list = os.listdir(dir_name)
+
+    print("-------------------------------------")
+    print(file_list)
+    print("-------------------------------------")
+
+    for x in file_list :
+
+        if x.endswith(".jpg"):
+            # print(x)
+            # print(os.path.join(dir_name, x).replace("\\","/"))
+            img_list.append(cv2.imread(os.path.join(dir_name, x).replace("\\","/")))
+   
+
+    for idx,val in enumerate(img_list):
+        plt.subplot(3,3,idx+1)
+        plt.imshow(val[:,:,::-1])
+        plt.xticks([])
+        plt.yticks([])
+
+
+
+nine_img()
+plt.show()

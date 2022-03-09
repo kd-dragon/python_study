@@ -1,0 +1,45 @@
+CAP_PROP_FRAME_WIDTH: 프레임 폭
+CAP_PROP_FRAME_HEIGHT: 프레임 높이
+CAP_PROP_FPS: 초당 프레임의 수
+CAP_PROP_ZOOM: 카메라 줌
+
+if cap.isOpened():
+    while True:
+        ret, img = cap.read()
+        # Boolean, Numpy 배열 객체를 쌍으로 갖는 튜플 객체를 반환 (ret이 False 면 프레임 읽기 실패 , 파일의 끝에 도달했거나 장치에 문제가 있을경우)
+
+        if ret:  # 프레임이 정상이라면
+            cv2.imshow(video_file, img)   # 화면에 표시
+            cv2.waitKey(25)    # 25ms 지연
+        else:
+            break
+else:
+    print("can't open video.")
+cap.release()
+cv2.destroyAllWindows()
+
+
+
+#linux 계열 DIVX, XVID, MJPG, X264, WMV1, WMV2.
+#windows 계열 DIVX
+
+# 새로운 스트링 포맷팅 (파이썬 3.6이상 버전에서만 지원)
+print(f"FPS: {fps}, Delay: {delay}")
+
+지연시간 = 1000 / fps
+1000으로 계산하는 이유는 1초(1s)가 1,000밀리 초(1,000ms)이기 때문입니다. 
+따라서 코드에서 지연 시간을 cv2.waitKey(int(1000/fps))로 설정한 것입니다.
+
+
+
+#캠찍기
+
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
+
+ frame = cv2.flip(img, 1)  # 이미지 좌우 반전(1), 이미지 상하 반전(0)
+ cv2.imshow('camera', frame)   # 화면에 표시
+ 
+ # 이미지 찍기
+ if cv2.waitKey(1) != -1 :  #아무키나 누르면
+	cv2.imwrite('photo.jpg', frame)  

@@ -1,0 +1,25 @@
+2) 리스트에서 고유하지 않은 값을 필터링하기 
+- collentions 모듈의 Counter 클래스를 사용하면 리스트의 모든 값의 갯수를 딕셔너리로 받을 수 있다.
+ 이 중 값의 갯수가 1인 것만 가져오면 고유하지 않은 값들만 가져올수 있다.
+
+from collections import Counter
+
+
+def filter_non_unique(list):
+    # print(Counter(list).items())
+    return [i for i, count in Counter(list).items() if count == 1]
+
+
+print(filter_non_unique([1,2,2,3,4,5,5]))
+
+3) 리스트에서 고유한 값을 필터링 하기
+
+from collections import Counter
+
+
+def filter_unique(list):
+    # print(Counter(list).items())
+    return [i for i, count in Counter(list).items() if count > 1]
+
+
+print(filter_unique([1,2,2,3,4,5,5]))

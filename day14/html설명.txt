@@ -1,0 +1,23 @@
+HTML이란? 웹 페이지를 만들기 위한 언어로 웹브라우저 위에서 동작하는 언어 ( HyperText Markup Language)
+
+HyperText (하이퍼텍스트) : 문서와 문서가 링크로 연결되어있는 것 
+Markup Language: 태그를 사용하여 글의 서식과 스타일을 정해주는 언어
+
+HTML의 문법
+
+1. 요소 (Element)
+
+HTML 요소는 시작 태그와 종료 태그 그리고 그 사이에 위치한 콘텐츠로 구성
+ex) <html>
+<body>
+	안녕하세요.
+	<img src="http://naver.imag.png"></img>
+</body>
+
+
+</html>
+
+2. 속성 (Attribute)
+HTML에게 추가적인 정보나 명령을 받을 수 있게 정보들을 전달해주는 것
+ex) <img src = "html.png">
+

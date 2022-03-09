@@ -1,0 +1,104 @@
+==============================================================
+매개변수 함수
+
+def sum(a, b, c, d, e):
+	return a+b+c+d+e
+	
+print(sum(1,2,3,4,5))
+
+
+--> 파라미터(인자) 수가 많아지면 매우 불편하므로 *args 로 받으면 편하다! 
+# *args, *asdfsfdsa, *myNames 라고 적어도된다.
+def sum_args(*args): 
+
+	print(f"args={args}, type={type(args)}")
+	
+	cnt = 0
+    for x in args:
+        cnt += x
+    return cnt
+
+=====================================================
+def person(name, age, city, mobile):
+    print(name)   
+person('kdy', 31, 'SEOUL', '010-1234-5678')
+
+
+=================================================================
+# 키워드 매개변수 ! **kwargs
+def keys(**kwargs):
+    print(f"args={kwargs}, type={type(kwargs)}")
+    for key, value in kwargs.items():
+        print(f"{key} is {value}")
+
+우리가 사용하는 내장 함수중에 kwargs 
+help(print)
+
+
+# 매개변수 우선순위! 
+일반변수 > *args > **kwargs
+
+1)일반변수 + *args (오류)
+def priority_args(*value, name):
+    print(f"name={name}, value={value}")
+	
+2)일반변수 + **kwargs (오류)
+def priority_kwargs(name, **kwargs)
+	print(f"name={name}, kwargs={kwargs}")
+    for key, value in kwargs.items():
+        print(f"{key} is {value}")
+
+3)일반변수 + *args + **kwargs 
+def priority_args_kwargs(name, *args, **kwargs):
+    print(f"name={name}, args={args},kwargs={kwargs}")
+    for key, value in kwargs.items():
+        print(f"{key} is {value}")
+
+==================================================================
+
+# 새로운 명령어를 만드는 공간
+
+def auto_move():
+	go_straight()
+	avoid_obstacle()
+
+def avoid_obstacle():
+	turn_left()
+	if front_is_clear() == False:
+		avoid_obstacle()		
+	
+def go_straight():
+	max_len = 0
+	x = get_direction()
+	
+	if x == 0:
+		max_len = get_max_x() - get_x()
+	elif x == 1:
+		max_len = get_max_y() - get_y()
+	elif x == 2:
+		max_len = get_x() - 1
+	elif x == 3:
+		max_len = get_y() - 1
+	else:
+		say("그런 방향은 없어!")
+	
+	repeat("move()", get_random(0, max_len))
+
+		
+# 명령어를 실행하는 공간
+
+say("출발!")
+repeat("auto_move()", 100)
+
+# 색깔 입히기 기능 추가!
+def move_repeat(count):
+	for x in range(count):
+		if get_color() != "":
+			clear_color()
+		else :
+			set_color("red")
+		move()
+
+====================================================================
+
+

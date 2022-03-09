@@ -1,0 +1,67 @@
+OpenCV 
+- 영상 처리(Image Processing) 와 컴퓨터 비전 (Computer Vision)을 위한 오픈소스 라이브러리
+- C, C++, 파이썬 등에서 사용가능 
+
+# 컴퓨터 비전이란 ?
+ - 영상 또는 이미지를 봤을 때 컴퓨터가 무엇인 지를 이해하는 것을 이야기한다. (사람의 시각 시스템을 컴퓨터가 구사할 수 있게끔하는 것)
+1. 컴퓨터 비전
+https://heung-bae-lee.github.io/2020/06/22/computer_vision_01/
+
+2. 디지털 이미지의 표현
+https://twlab.tistory.com/23
+
+파이참 > settings > opencv-python 선택후 오른쪽위 + 버튼 > opencv-python 검색 및 설치
+
+
+이미지 읽어오기
+imprt cv2
+
+1. 이미지를 읽어서 Numpy 객체로 만들기
+
+cv2.imread(file_name, flag) 
+ -> (반환값 numpy 객체: (행, 열, 색상 -> BGR) 
+
+- file_name : 이미지파일 경로+이름
+- flag : 이미지를 읽는 옵션
+ 1) IMREAD_COLOR: 이미지를 칼라로 읽고 투명한 부분은 무시
+ 2) IMREAD_GRAYSCALE: 이미지를 회색스케일로 읽기
+ 3) IMREAD_UNCHANGED: 이미지를 칼라로 읽고, 투명한 부분도 읽기 
+ 
+ ** Numpy 객체는 기본 BGR!!! (보통 RGB사용)
+ 
+2. 특정한 이미지를 화면에 출력하기
+
+cv2.imshow(title, image)
+ - title: 윈도우 창의 제목
+ - image: 출력할 이미지 객체
+ 
+3. 특정한 이미지를 파일로 저장하는 함수 (처리가 끝난이미지를 파일형태로 저장)
+
+cv.imwrite(file_name, image) 
+ - file_name: 저장할 이미지 파일 이름
+ - image: 저장할 이미지 객체
+ 
+ 
+4. OpenCV 윈도우 창에서 입력을 받는 함수
+cv2.waitKey(time)
+- time: 입력 대기 시간 (무한대기: 0)
+반환값: 사용자가 입력한 Ascii Code (예를 들어 ESC는 : 27번)
+
+5. 화면의 모든 윈도우를 닫는 함수
+cv2.destoryAllWindows()
+
+=========================================================
+
+실습1) 이미지 imread, imshow, waitKey, imwrite
+
+img_background = cv2.imread("./image/1.jpg", cv2.IMREAD_COLOR)
+cv2.imshow("IMAGE BASIC", img_background)
+asciiCode = cv2.waitKey()
+cv2.imwrite("result.png", img_background)
+
+
+
+
+
+
+ 

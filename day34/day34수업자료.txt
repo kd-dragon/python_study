@@ -1,0 +1,29 @@
+day34 수업자료
+
+파일 관련 처리할 때 os모듈을 반드시 사용하게 될 것입니다.
+os 모듈에는 다양한 폴더,파일 처리 함수가 있습니다.
+그 중에서 오늘은 파일/디렉토리 조회에 사용되는 몇가지 주요한 함수를 알아보겠습니다.
+
+1) os.path.abspath(name): name의 절대경로를 반환한다. name에는 파일 또는 폴더이름 들어온다.
+2) os.path.dirname(파일): 해당 파일의 디렉토리 경로를 반환한다.
+3) os.path.join(path1, path2, ... ) : OS 형식에 맞게 각각의 경로들을 하나의 경로로 이어준다.
+
+특정 디렉토리에서 여러 파일 가져오기
+
+3) os.listdir() : 입력 경로 내의 모든 파일과 폴더명 리스트 반환
+
+4) os.walk() : 입력한 경로부터 그 경로 내의 모든 하위 디렉토리까지 하나하나 찾아다니며, 각각의 경로와 폴더명, 파일명들을 반환
+               (generator로 반환해주기 때문에 for문을 사용해야한다.)
+5) os.path.split() : 경로와 파일 분리 
+6) os.path.splitext() : 확장자 분리
+			   
+*generator 는 간단하게 설명하면 iterator 를 생성해 주는 function 이다. memory를 효율적으로 사용할 수 있다.
+ generator 의 경우 데이터 값을 한꺼번에 메모리에 적재 하는 것이 아니라
+ next() 메소드를 통해 차례로 값에 접근할 때마다 메모리에 적재하는 방식이다.
+
+#### cv.imread, write시 한글 인식 문제
+img_array = np.fromfile("C:/Users/KDY/Desktop/파이썬/dailyQuiz/day34/imgs/1.jpg", np.uint8)
+img = cv2.imdecode(img_array, cv2.IMREAD_COLOR) 
+
+
+

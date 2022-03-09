@@ -1,0 +1,85 @@
+마우스 이벤트 
+
+마우스에서입력을 받으려면 이벤트를 처리할 함수를 미리 선언!!! (함수이름은 사용자가 지정가능)
+def onMouse(event, x, y, flags, param):
+  # 여기에 마우스 이벤트에 맞게 할 작업을 작성
+
+cv2.setMouseCallback() 함수에 원하는 파라미터를 전달한다.
+
+cv2.setMouseCallback(win_name, onMouse, param[선택]): onMouse 함수를 등록
+
+win_name: 이벤트를 등록할 윈도우 이름 (title)
+onMouse: 이벤트 처리를 위해 미리 선언해 놓은 콜백함수
+param: 필요에 따라 onMouse 함수에 전달할 인자
+
+
+Callback함수(event, x, y, flags, param):
+
+event: 마우스 이벤트 종류 (12가지)
+x, y : 마우스 현재 좌표
+flags: 마우스 동작과 함께 일어난 상태! (6가지) 
+     --> 예를 들어 Shift 키와 Ctrl 키를 함께 누른 상태처럼 여러가지 상태를 하나의 값으로 한번에 나타낼때 사용
+  ex) flags & cv
+
+
+
+======================= 마우스 이벤트 예제 =======================
+import cv2
+
+title = 'mouse event'                   # 창 제목
+img = cv2.imread('../img/blank_500.jpg') # 백색 이미지 읽기
+cv2.imshow(title, img)                  # 백색 이미지 표시
+
+colors = {'black':(0,0,0),
+         'red' : (0,0,255),
+         'blue':(255,0,0),
+         'green': (0,255,0) }
+
+def onMouse(event, x, y, flags, param): # 마우스 콜백 함수 구현 ---①
+    print(event, x, y, )                # 파라미터 출력
+    if event == cv2.EVENT_LBUTTONDOWN:  # 왼쪽 버튼 누름인 경우 ---②
+        cv2.circle(img, (x,y), 30, colors['black'], -1) # 지름 30 크기의 검은색 원을 해당 좌표에 그림
+        cv2.imshow(title, img)          # 그려진 이미지를 다시 표시 ---③
+
+cv2.setMouseCallback(title, onMouse)    # 마우스 콜백 함수를 GUI 윈도우에 등록 ---④
+
+while True:
+    if cv2.waitKey(0) & 0xFF == 27:     # esc로 종료
+        break
+cv2.destroyAllWindows()
+
+======================= 마우스 이벤트 예제 (flags)  =======================
+
+  
+import cv2
+
+title = 'mouse event'                   # 창 제목
+img = cv2.imread('blank_img.jpg') # 백색 이미지 읽기
+cv2.imshow(title, img)                  # 백색 이미지 표시
+
+colors = {'black':(0,0,0),
+         'red' : (0,0,255),
+         'blue':(255,0,0),
+         'green': (0,255,0) } # 색상 미리 정의
+
+def onMouse(event, x, y, flags, param): # 마우스 콜백 함수 구현 ---①
+    print(event, x, y, flags)                # 파라미터 출력
+    color = colors['black']
+    if event == cv2.EVENT_LBUTTONDOWN:  # 왼쪽 버튼 누름인 경우 ---②
+        # 컨트롤키와 쉬프트 키를 모두 누른 경우
+        if flags & cv2.EVENT_FLAG_CTRLKEY and flags & cv2.EVENT_FLAG_SHIFTKEY : 
+            color = colors['green']
+        elif flags & cv2.EVENT_FLAG_SHIFTKEY : # 쉬프트 키를 누른 경우
+            color = colors['blue']
+        elif flags & cv2.EVENT_FLAG_CTRLKEY : # 컨트롤 키를 누른 경우
+            color = colors['red']
+        # 지름 30 크기의 검은색 원을 해당 좌표에 그림
+        cv2.circle(img, (x,y), 30, color, -1) 
+        cv2.imshow(title, img)          # 그려진 이미지를 다시 표시 ---③
+
+cv2.setMouseCallback(title, onMouse)    # 마우스 콜백 함수를 GUI 윈도우에 등록 ---④
+
+while True:
+    if cv2.waitKey(0) & 0xFF == 27:     # esc로 종료
+        break
+cv2.destroyAllWindows()

@@ -1,0 +1,26 @@
+import cv2
+
+img = cv2.imread("3.jpg")
+
+title = "Movement"
+x, y = 100, 100  # 초기화 좌표
+
+while True:
+    cv2.imshow(title, img)
+    cv2.moveWindow(title, x, y)
+    key = cv2.waitKey(0)
+    print(key, chr(key))
+    if key == ord('g'):
+        x -= 10
+    elif key == ord('h'):
+        y += 10
+    elif key == ord('j'):
+        x += 10
+    elif key == ord('y'):
+        y -= 10
+    elif key == ord('q') or key == 27:
+        break
+
+    cv2.moveWindow(title, x, y)
+
+cv2.destroyAllWindows()
